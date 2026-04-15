@@ -3,6 +3,7 @@
 namespace App\Domains\Booking\Models;
 
 use App\Domains\Account\Models\Address;
+use App\Domains\Booking\Enums\BookingStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,7 @@ class Booking extends Model
 
     protected $fillable = [
         'user_id',
+        'address_id',
         'scheduled_at',
         'total_amount',
         'status',
@@ -26,6 +28,7 @@ class Booking extends Model
         'scheduled_at' => 'datetime',
         'total_amount' => 'decimal:2',
         'metadata' => 'array',
+        'status' => BookingStatus::class,
     ];
 
     /**

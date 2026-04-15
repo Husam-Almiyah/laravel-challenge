@@ -13,14 +13,15 @@ class BookingItem extends Model
 
     protected $fillable = [
         'booking_id',
-        'item_id',
-        'item_type',
+        'itemable_id',
+        'itemable_type',
+        'name',
+        'price',
         'quantity',
-        'unit_price',
     ];
 
     protected $casts = [
-        'unit_price' => 'decimal:2',
+        'price' => 'decimal:2',
     ];
 
     /**
@@ -34,7 +35,7 @@ class BookingItem extends Model
     /**
      * Get the item entity (Service or Package).
      */
-    public function item(): MorphTo
+    public function itemable(): MorphTo
     {
         return $this->morphTo();
     }
