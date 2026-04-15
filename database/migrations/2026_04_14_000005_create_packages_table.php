@@ -9,11 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('packages', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('name');
             $table->string('slug')->unique();
+            $table->foreignUlid('category_id')->nullable()->constrained('categories')->nullOnDelete();
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
+            $table->decimal('discount_percentage', 5, 2)->default(0);
             $table->boolean('is_active')->default(true);
             $table->softDeletes();
             $table->timestamps();

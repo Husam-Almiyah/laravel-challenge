@@ -12,7 +12,7 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->ulidMorphs('payer');
             $table->ulidMorphs('payable');
-            $table->foreignId('gateway_id')->nullable()->constrained('payment_gateways')->nullOnDelete();
+            $table->foreignUlid('gateway_id')->nullable()->constrained('payment_gateways')->nullOnDelete();
             $table->decimal('amount', 10, 2);
             $table->string('currency')->default('SAR');
             $table->string('status')->default('pending')->index();
@@ -20,6 +20,12 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->softDeletes();
             $table->timestamps();
+
+            // Indexes for performance
+            $table->index(['payer_type', 'payer_id'], 'idx_payer');
+            $table->index(['payable_type', 'payable_id'], 'idx_payable');
+            $table->index(['gateway_id', 'status'], 'idx_gateway_status');
+            $table->index('created_at');
         });
     }
 

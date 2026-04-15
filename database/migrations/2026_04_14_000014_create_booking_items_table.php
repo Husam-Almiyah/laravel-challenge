@@ -11,10 +11,15 @@ return new class extends Migration
         Schema::create('booking_items', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->foreignUlid('booking_id')->constrained('bookings')->onDelete('cascade');
-            $table->numericMorphs('item');
+            $table->ulidMorphs('itemable');
+            $table->string('name');
+            $table->decimal('price', 10, 2);
             $table->integer('quantity')->default(1);
-            $table->decimal('unit_price', 10, 2);
             $table->timestamps();
+
+            // Indexes
+            $table->index(['booking_id'], 'idx_booking_items_booking');
+            $table->index(['itemable_type', 'itemable_id'], 'idx_booking_items_itemable');
         });
     }
 

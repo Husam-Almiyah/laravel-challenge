@@ -9,12 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('subscription_plans', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('name');
             $table->string('slug')->unique();
+            $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
             $table->integer('duration_days');
-            $table->boolean('is_trial')->default(false);
+            $table->integer('trial_days')->default(0);
+            $table->json('features')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
