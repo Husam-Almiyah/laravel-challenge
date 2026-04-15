@@ -2,15 +2,17 @@
 
 namespace App\Domains\Payments\Models;
 
+use App\Domains\Payments\States\TransactionState;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\ModelStates\HasStates;
 
 class Transaction extends Model
 {
-    use HasUlids, SoftDeletes;
+    use HasStates, HasUlids, SoftDeletes;
 
     protected $fillable = [
         'payer_id',
@@ -28,6 +30,7 @@ class Transaction extends Model
     protected $casts = [
         'metadata' => 'array',
         'amount' => 'decimal:2',
+        'status' => TransactionState::class,
     ];
 
     /**

@@ -14,8 +14,8 @@ class PaymentGatewaySeeder extends Seeder
     {
         $gateways = [
             [
-                'name' => 'Mada',
-                'driver' => 'MadaDriver',
+                'name' => 'mada',
+                'driver' => 'mada',
                 'priority' => 1,
                 'currency' => 'SAR',
                 'rules' => [
@@ -25,8 +25,8 @@ class PaymentGatewaySeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'name' => 'Apple Pay',
-                'driver' => 'ApplePayDriver',
+                'name' => 'apple_pay',
+                'driver' => 'apple_pay',
                 'priority' => 2,
                 'currency' => 'SAR',
                 'rules' => [
@@ -36,8 +36,8 @@ class PaymentGatewaySeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'name' => 'Stripe',
-                'driver' => 'StripeDriver',
+                'name' => 'stripe',
+                'driver' => 'stripe',
                 'priority' => 3,
                 'currency' => 'SAR',
                 'rules' => [

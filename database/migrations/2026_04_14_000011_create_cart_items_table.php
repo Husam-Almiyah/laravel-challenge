@@ -11,10 +11,15 @@ return new class extends Migration
         Schema::create('cart_items', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->foreignUlid('cart_id')->constrained('carts')->onDelete('cascade');
-            $table->numericMorphs('item');
+            $table->ulidMorphs('itemable');
+            $table->string('name');
+            $table->decimal('price', 10, 2);
             $table->integer('quantity')->default(1);
-            $table->decimal('unit_price', 10, 2);
             $table->timestamps();
+
+            // Indexes
+            $table->index(['cart_id'], 'idx_cart');
+            $table->index(['itemable_type', 'itemable_id'], 'idx_itemable');
         });
     }
 
