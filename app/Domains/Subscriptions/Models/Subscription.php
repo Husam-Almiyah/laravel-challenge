@@ -2,6 +2,7 @@
 
 namespace App\Domains\Subscriptions\Models;
 
+use App\Domains\Subscriptions\Enums\SubscriptionStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -18,11 +19,14 @@ class Subscription extends Model
         'starts_at',
         'ends_at',
         'status',
+        'is_trial',
     ];
 
     protected $casts = [
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'is_trial' => 'boolean',
+        'status' => SubscriptionStatus::class,
     ];
 
     /**
