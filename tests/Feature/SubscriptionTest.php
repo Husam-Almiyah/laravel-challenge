@@ -12,7 +12,7 @@ beforeEach(function () {
     $this->plan = SubscriptionPlan::create([
         'name' => 'Pro Plan',
         'slug' => 'pro-plan',
-        'details' => 'Pro plan details',
+        'description' => 'Pro plan details',
         'price' => 100,
         'duration_days' => 30,
         'trial_days' => 14,
@@ -68,5 +68,89 @@ it('cannot activate trial twice', function () {
         ->assertJson([
             'success' => false,
             'message' => 'Trial subscription already used',
+        ]);
+});
+
+it('cannot activate trial for plan without trial days', function () {
+    $planWithoutTrial = SubscriptionPlan::create([
+        'name' => 'Basic Plan',
+        'slug' => 'basic-plan',
+        'description' => 'Basic plan without trial',
+        'price' => 50,
+        'duration_days' => 30,
+        'trial_days' => 0,
+        'is_active' => true,
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson('/api/v1/subscriptions/trial', [
+        'plan_id' => $planWithoutTrial->id,
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJson([
+            'success' => false,
+            'message' => 'This plan does not offer a trial',
+        ]);
+});
+
+it('cannot activate trial if user has active subscription', function () {
+    // Create an active subscription
+    Subscription::create([
+        'user_id' => $this->user->id,
+        'plan_id' => $this->plan->id,
+        'starts_at' => now(),
+        'ends_at' => now()->addDays(30),
+        'status' => 'active',
+        'is_trial' => false,
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson('/api/v1/subscriptions/trial', [
+        'plan_id' => $this->plan->id,
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJson([
+            'success' => false,
+            'message' => 'User already has an active subscription',
+        ]);
+});
+
+it('can get user subscription', function () {
+    Subscription::create([
+        'user_id' => $this->user->id,
+        'plan_id' => $this->plan->id,
+        'starts_at' => now(),
+        'ends_at' => now()->addDays(30),
+        'status' => 'active',
+        'is_trial' => true,
+    ]);
+
+    $response = $this->actingAs($this->user)->getJson('/api/v1/subscriptions/my');
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'success' => true,
+            'data' => [
+                'subscription' => [
+                    'plan' => [
+                        'id' => $this->plan->id,
+                        'name' => $this->plan->name,
+                    ],
+                    'status' => 'active',
+                    'is_trial' => true,
+                ],
+            ],
+        ]);
+});
+
+it('returns null when user has no subscription', function () {
+    $response = $this->actingAs($this->user)->getJson('/api/v1/subscriptions/my');
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'success' => true,
+            'data' => [
+                'subscription' => null,
+            ],
         ]);
 });

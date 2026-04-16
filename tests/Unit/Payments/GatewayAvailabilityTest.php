@@ -16,7 +16,7 @@ test('it filters gateways by city', function () {
     // 1. Create a gateway restricted to Riyadh (ID 1)
     $mada = PaymentGateway::create([
         'name' => 'mada',
-        'driver' => 'MadaDriver',
+        'driver' => 'mada',
         'rules' => ['cities' => [1]],
         'is_active' => true,
     ]);
@@ -31,19 +31,19 @@ test('it filters gateways by city', function () {
 test('it filters gateways by module', function () {
     $mada = PaymentGateway::create([
         'name' => 'mada',
-        'driver' => 'MadaDriver',
+        'driver' => 'mada',
         'rules' => ['modules' => ['booking']],
         'is_active' => true,
     ]);
 
-    expect($this->resolver->isAvailable($mada, ['module' => 'booking']))->toBeTrue();
-    expect($this->resolver->isAvailable($mada, ['module' => 'subscription']))->toBeFalse();
+    expect($this->resolver->isAvailable($mada, ['modules' => ['booking']]))->toBeTrue();
+    expect($this->resolver->isAvailable($mada, ['modules' => ['subscription']]))->toBeFalse();
 });
 
 test('it filters gateways by user status', function () {
     $applePay = PaymentGateway::create([
         'name' => 'apple_pay',
-        'driver' => 'ApplePayDriver',
+        'driver' => 'applePay',
         'rules' => ['required_status' => 'verified'],
         'is_active' => true,
     ]);
@@ -55,7 +55,7 @@ test('it filters gateways by user status', function () {
 test('it filters gateways by allowed days', function () {
     $stripe = PaymentGateway::create([
         'name' => 'stripe',
-        'driver' => 'StripeDriver',
+        'driver' => 'stripe',
         'rules' => ['allowed_days' => [1, 2, 3]], // Mon, Tue, Wed
         'is_active' => true,
     ]);
@@ -68,7 +68,7 @@ test('it filters gateways by minimum amount', function () {
     // 1. Create a gateway with min_amount of 100
     $stripe = PaymentGateway::create([
         'name' => 'stripe',
-        'driver' => 'StripeDriver',
+        'driver' => 'stripe',
         'rules' => ['min_amount' => 100],
         'is_active' => true,
     ]);

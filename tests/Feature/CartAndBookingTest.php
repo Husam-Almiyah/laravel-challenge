@@ -3,6 +3,9 @@
 use App\Domains\Booking\Models\Cart;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Service;
+use App\Domains\Subscriptions\Enums\SubscriptionStatus;
+use App\Domains\Subscriptions\Models\Subscription;
+use App\Domains\Subscriptions\Models\SubscriptionPlan;
 use App\Models\City;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +28,16 @@ beforeEach(function () {
         'description' => 'Home cleaning',
         'price' => 50,
         'is_active' => true,
+    ]);
+
+    // Create active subscription for the user
+    $plan = SubscriptionPlan::factory()->create();
+    Subscription::create([
+        'user_id' => $this->user->id,
+        'plan_id' => $plan->id,
+        'starts_at' => now()->subDay(),
+        'ends_at' => now()->addMonth(),
+        'status' => SubscriptionStatus::ACTIVE,
     ]);
 });
 

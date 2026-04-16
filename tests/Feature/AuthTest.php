@@ -131,3 +131,54 @@ test('unauthenticated user cannot access protected routes', function () {
 
     $response->assertStatus(401);
 });
+
+test('user can register with valid phone number', function () {
+    $response = $this->postJson('/api/v1/auth/register', [
+        'name' => 'Test User',
+        'email' => 'phone@example.com',
+        'password' => 'AjeerBoost@2026!',
+        'password_confirmation' => 'AjeerBoost@2026!',
+        'phone' => '+966 50 123 4567',
+    ]);
+
+    $response->assertStatus(201);
+    $this->assertDatabaseHas('users', ['phone' => '+966 50 123 4567']);
+});
+
+test('user can register without phone number', function () {
+    $response = $this->postJson('/api/v1/auth/register', [
+        'name' => 'Test User',
+        'email' => 'nophone@example.com',
+        'password' => 'AjeerBoost@2026!',
+        'password_confirmation' => 'AjeerBoost@2026!',
+        'phone' => null,
+    ]);
+
+    $response->assertStatus(201);
+});
+
+test('user cannot register with invalid phone number format', function () {
+    $response = $this->postJson('/api/v1/auth/register', [
+        'name' => 'Test User',
+        'email' => 'badphone@example.com',
+        'password' => 'AjeerBoost@2026!',
+        'password_confirmation' => 'AjeerBoost@2026!',
+        'phone' => 'invalid-phone-123',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['phone']);
+});
+
+test('user cannot register with compromised password', function () {
+    // 'password' is a well-known compromised password
+    $response = $this->postJson('/api/v1/auth/register', [
+        'name' => 'Test User',
+        'email' => 'compromised@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['password']);
+});
