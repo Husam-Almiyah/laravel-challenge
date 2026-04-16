@@ -26,7 +26,7 @@ class PaymentGatewaySeeder extends Seeder
             ],
             [
                 'name' => 'apple_pay',
-                'driver' => 'apple_pay',
+                'driver' => 'applePay',
                 'priority' => 2,
                 'currency' => 'SAR',
                 'rules' => [

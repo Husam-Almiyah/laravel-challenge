@@ -18,9 +18,17 @@ class ApplePayDriver implements PaymentGatewayInterface
         return 'apple_pay';
     }
 
+    /**
+     * Process an Apple Pay payment.
+     *
+     * Mock behavior (for demo/testing only):
+     * - Always succeeds immediately (Apple Pay is typically a direct payment)
+     *
+     * @mock-only In production, replace with actual Apple Pay JS / merchant API integration
+     */
     public function pay(Transaction $transaction, array $options = []): PaymentResponse
     {
-        // Simple success mock
+        // Simple success mock - Apple Pay is typically a direct, no-redirect flow
         $transaction->status->transitionTo(Paid::class);
         $transaction->update(['reference' => 'APPLE-'.uniqid()]);
 

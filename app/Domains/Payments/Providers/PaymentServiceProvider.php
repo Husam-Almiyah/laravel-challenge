@@ -2,17 +2,8 @@
 
 namespace App\Domains\Payments\Providers;
 
-use App\Domains\Payments\Events\PaymentFailed;
-use App\Domains\Payments\Events\PaymentInitiated;
-use App\Domains\Payments\Events\PaymentSucceeded;
-use App\Domains\Payments\Events\WebhookReceived;
-use App\Domains\Payments\Listeners\LogPaymentFailed;
-use App\Domains\Payments\Listeners\LogPaymentInitiated;
-use App\Domains\Payments\Listeners\LogPaymentSucceeded;
-use App\Domains\Payments\Listeners\LogWebhookReceived;
 use App\Domains\Payments\PaymentManager;
 use App\Domains\Payments\Services\GatewayAvailabilityResolver;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class PaymentServiceProvider extends ServiceProvider
@@ -36,24 +27,12 @@ class PaymentServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Event::listen(
-            PaymentInitiated::class,
-            LogPaymentInitiated::class
-        );
-
-        Event::listen(
-            PaymentSucceeded::class,
-            LogPaymentSucceeded::class
-        );
-
-        Event::listen(
-            PaymentFailed::class,
-            LogPaymentFailed::class
-        );
-
-        Event::listen(
-            WebhookReceived::class,
-            LogWebhookReceived::class
-        );
+        // Event listeners are auto-discovered via Laravel's event discovery
+        // Listeners in app/Domains/Payments/Listeners follow the naming convention:
+        // PaymentInitiated -> LogPaymentInitiated, FulfillTransaction
+        // PaymentSucceeded -> LogPaymentSucceeded, FulfillTransaction
+        // PaymentFailed -> LogPaymentFailed
+        // PaymentCompleted -> LogPaymentCompleted
+        // WebhookReceived -> LogWebhookReceived
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Payments;
 
+use App\Domains\Catalog\Enums\ModuleEnum;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ListGatewaysRequest extends FormRequest
 {
@@ -16,7 +18,8 @@ class ListGatewaysRequest extends FormRequest
         return [
             'city_id' => 'required|exists:cities,id',
             'amount' => 'required|numeric|min:0',
-            'module' => 'nullable|string',
+            'modules' => 'nullable|array',
+            'modules.*' => [Rule::enum(ModuleEnum::class)],
         ];
     }
 }

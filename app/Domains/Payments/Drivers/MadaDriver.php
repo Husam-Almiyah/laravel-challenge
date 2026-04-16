@@ -20,9 +20,19 @@ class MadaDriver implements PaymentGatewayInterface
         return 'mada';
     }
 
+    /**
+     * Process a Mada payment.
+     *
+     * Mock behavior (for demo/testing only):
+     * - Amount of exactly 404.00 will always fail
+     * - All other amounts succeed immediately
+     *
+     * @mock-only In production, replace with actual Mada API integration
+     */
     public function pay(Transaction $transaction, array $options = []): PaymentResponse
     {
         // Mocking logic: If amount is exactly 404, fail it. Otherwise, success.
+        // This simulates a gateway-declined transaction for testing error flows.
         if ($transaction->amount == 404.00) {
             $transaction->status->transitionTo(Failed::class);
 
@@ -35,6 +45,11 @@ class MadaDriver implements PaymentGatewayInterface
         return PaymentResponse::successful($transaction->reference, 'Mada payment processed successfully.');
     }
 
+    /**
+     * Verify the payment status from the Mada gateway.
+     *
+     * @mock-only Always returns success in demo mode
+     */
     public function verify(Transaction $transaction): PaymentResponse
     {
         return PaymentResponse::successful($transaction->reference, 'Transaction verified.');
