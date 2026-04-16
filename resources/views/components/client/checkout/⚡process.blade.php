@@ -5,8 +5,16 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use App\Models\City;
 use App\Domains\Booking\Models\Cart;
+use App\Domains\Booking\Services\BookingService;
 use App\Domains\Payments\Services\GatewayAvailabilityResolver;
 use App\Domains\Payments\Models\PaymentGateway;
+use App\Domains\Payments\Models\Transaction;
+use App\Domains\Payments\PaymentManager;
+use App\Domains\Payments\Events\PaymentInitiated;
+use App\Domains\Payments\Events\PaymentSucceeded;
+use App\Domains\Catalog\Models\Service;
+use App\Domains\Catalog\Enums\ModuleEnum;
+use App\Domains\Account\Enums\UserStatus;
 
 new #[Layout('layouts.app'), Title('Secure Checkout - Ajeer Boost')] class extends Component
 {
@@ -35,6 +43,11 @@ new #[Layout('layouts.app'), Title('Secure Checkout - Ajeer Boost')] class exten
         if ($user->cart?->items->count() === 0) {
             return $this->redirect('/catalog');
         }
+
+        if (!$user->hasActiveSubscription()) {
+            session()->flash('error', 'You must have an active subscription to book services.');
+            return $this->redirect('/catalog');
+        }
     }
 
     public function goToPayment()
@@ -59,7 +72,8 @@ new #[Layout('layouts.app'), Title('Secure Checkout - Ajeer Boost')] class exten
             'user' => $user,
             'city_id' => $this->selectedCityId,
             'amount' => $total,
-            'module' => 'maintenance', // Example module
+            'modules' => $cart->items->map(fn($item) => $item->itemable_type == Service::class ? ModuleEnum::BOOKING->value : ModuleEnum::SUBSCRIPTION->value)->toArray(),
+            'user_status' => $user->resolveStatus()->value,
         ];
 
         $this->availableGateways = $resolver->getAvailableGateways($context);
@@ -75,13 +89,73 @@ new #[Layout('layouts.app'), Title('Secure Checkout - Ajeer Boost')] class exten
             'selectedGatewayId' => 'required',
         ]);
 
-        // Simulate payment processing
-        sleep(1);
+        $user = auth()->user();
+        $cart = $user->cart;
+        $total = $cart->items->sum(fn($item) => $item->price * $item->quantity);
+        $gateway = PaymentGateway::findOrFail($this->selectedGatewayId);
 
-        // Clear cart
-        auth()->user()->cart->items()->delete();
+        try {
+            // 1. Ensure address is saved
+            $address = $this->ensureAddressPersisted();
 
-        $this->step = 3;
+            // 2. Create Booking
+            $bookingService = new BookingService();
+            $booking = $bookingService->createFromCart($user, [
+                'address_id' => $address->id,
+                'scheduled_at' => now()->addDays(2), // Example scheduling
+                'notes' => 'Created via checkout UI',
+            ]);
+
+            // 3. Create Transaction
+            $transaction = Transaction::create([
+                'payer_id' => $user->id,
+                'payer_type' => get_class($user),
+                'payable_id' => $booking->id,
+                'payable_type' => get_class($booking),
+                'gateway_id' => $gateway->id,
+                'amount' => $total,
+                'currency' => $gateway->currency ?? 'SAR',
+            ]);
+
+            event(new PaymentInitiated($transaction));
+
+            // 4. Resolve Driver and Pay
+            $paymentManager = app(PaymentManager::class);
+            $driver = $paymentManager->driver($gateway->driver);
+            $response = $driver->pay($transaction);
+
+            if ($response->success) {
+                event(new PaymentSucceeded($transaction));
+                $this->step = 3;
+            } else {
+                event(new PaymentFailed($transaction, $response->message));
+                session()->flash('error', $response->message);
+            }
+
+        } catch (\Exception $e) {
+            session()->flash('error', 'Checkout failed: ' . $e->getMessage());
+        }
+    }
+
+    protected function ensureAddressPersisted()
+    {
+        $user = auth()->user();
+        
+        $address = $user->addresses()
+            ->where('city_id', $this->selectedCityId)
+            ->where('address_details', $this->addressDetails)
+            ->first();
+            
+        if (!$address) {
+            $address = $user->addresses()->create([
+                'city_id' => $this->selectedCityId,
+                'address_details' => $this->addressDetails,
+                'district' => 'N/A', // Defaulting since it's not in the UI yet
+                'is_default' => $user->addresses()->count() === 0,
+            ]);
+        }
+        
+        return $address;
     }
 };
 ?>
