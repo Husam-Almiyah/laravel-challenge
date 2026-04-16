@@ -7,11 +7,9 @@ use App\Domains\Booking\Models\CartItem;
 use App\Domains\Catalog\Models\Package;
 use App\Domains\Catalog\Models\Service;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Cart\AddToCartRequest;
-use App\Http\Requests\Cart\UpdateCartRequest;
-use App\Http\Resources\CartResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CartController extends Controller
 {
@@ -20,12 +18,8 @@ class CartController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $cart = Cart::with(['items.itemable' => function ($morphTo) {
-            $morphTo->morphWith([
-                Service::class => ['category'],
-                Package::class => ['services'],
-            ]);
-        }])->firstOrCreate(['user_id' => $request->user()->id]);
+        $cart = Cart::with(['items.itemable.category', 'items.itemable.services'])
+            ->firstOrCreate(['user_id' => $request->user()->id]);
 
         $total = $cart->items->sum(function ($item) {
             return $item->price * $item->quantity;
@@ -34,7 +28,28 @@ class CartController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'cart' => new CartResource($cart),
+                'cart' => [
+                    'id' => $cart->id,
+                    'items' => $cart->items->map(fn ($item) => [
+                        'id' => $item->id,
+                        'itemable_type' => $item->itemable_type,
+                        'name' => $item->name,
+                        'price' => $item->price,
+                        'quantity' => $item->quantity,
+                        'subtotal' => $item->price * $item->quantity,
+                        'itemable' => $item->itemable ? [
+                            'id' => $item->itemable->id,
+                            'name' => $item->itemable->name,
+                            'type' => class_basename($item->itemable),
+                            'category' => $item->itemable->category?->name ?? null,
+                            'services_count' => $item->itemable instanceof Package
+                                ? $item->itemable->services->count()
+                                : null,
+                        ] : null,
+                    ]),
+                    'total' => $total,
+                    'items_count' => $cart->items->count(),
+                ],
             ],
         ]);
     }
@@ -42,60 +57,90 @@ class CartController extends Controller
     /**
      * Add item to cart.
      */
-    public function store(AddToCartRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
+        $request->validate([
+            'itemable_id' => 'required|ulid',
+            'itemable_type' => 'required|in:'.Service::class.','.Package::class,
+            'quantity' => 'required|integer|min:1|max:10',
+        ]);
 
-        // Check if item already exists in cart
-        $existingItem = CartItem::where('cart_id', $cart->id)
-            ->where('itemable_id', $request->itemable_id)
-            ->where('itemable_type', $request->itemable_type)
-            ->first();
+        return DB::transaction(function () use ($request) {
+            // Use lockForUpdate to prevent race conditions
+            $cart = Cart::where('user_id', $request->user()->id)
+                ->lockForUpdate()
+                ->firstOrCreate(['user_id' => $request->user()->id]);
 
-        if ($existingItem) {
-            $existingItem->increment('quantity', $request->quantity);
-            $item = $existingItem;
-        } else {
-            // Get the item details using explicit mapping for security
-            $modelClass = match ($request->itemable_type) {
-                Service::class => Service::class,
-                Package::class => Package::class,
-                default => throw new \InvalidArgumentException('Invalid itemable type'),
-            };
+            // Get the item details
+            $itemable = $request->itemable_type::findOrFail($request->itemable_id);
 
-            $itemable = $modelClass::findOrFail($request->itemable_id);
+            // Calculate price (apply discount for packages)
+            $price = $this->calculateItemPrice($itemable);
 
-            $item = CartItem::create([
-                'cart_id' => $cart->id,
-                'itemable_id' => $itemable->id,
-                'itemable_type' => $itemable::class,
-                'name' => $itemable->name,
-                'price' => $itemable->price,
-                'quantity' => $request->quantity,
-            ]);
+            // Use updateOrCreate to handle race conditions with unique constraint
+            $item = CartItem::where('cart_id', $cart->id)
+                ->where('itemable_id', $itemable->id)
+                ->where('itemable_type', $itemable::class)
+                ->lockForUpdate()
+                ->first();
+
+            if ($item) {
+                // Update existing item
+                $item->increment('quantity', $request->quantity);
+            } else {
+                // Create new item
+                $item = CartItem::create([
+                    'cart_id' => $cart->id,
+                    'itemable_id' => $itemable->id,
+                    'itemable_type' => $itemable::class,
+                    'name' => $itemable->name,
+                    'price' => $price,
+                    'quantity' => $request->quantity,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item added to cart',
+                'data' => [
+                    'item' => [
+                        'id' => $item->id,
+                        'name' => $item->name,
+                        'price' => $item->price,
+                        'quantity' => $item->quantity,
+                        'subtotal' => $item->price * $item->quantity,
+                    ],
+                ],
+            ], 201);
+        });
+    }
+
+    /**
+     * Calculate item price with discount if applicable.
+     */
+    protected function calculateItemPrice($itemable): float
+    {
+        // Apply discount for packages
+        if ($itemable instanceof Package && $itemable->discount_percentage > 0) {
+            return $itemable->price * (1 - $itemable->discount_percentage / 100);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Item added to cart',
-            'data' => [
-                'item' => [
-                    'id' => $item->id,
-                    'name' => $item->name,
-                    'price' => $item->price,
-                    'quantity' => $item->quantity,
-                    'subtotal' => $item->price * $item->quantity,
-                ],
-            ],
-        ], 201);
+        return $itemable->price;
     }
 
     /**
      * Update cart item quantity.
      */
-    public function update(UpdateCartRequest $request, string $itemId): JsonResponse
+    public function update(Request $request, string $itemId): JsonResponse
     {
+        $request->validate([
+            'quantity' => 'required|integer|min:1|max:10',
+        ]);
+
         $cart = Cart::where('user_id', $request->user()->id)->firstOrFail();
+
+        $this->authorize('update', $cart);
+
         $item = CartItem::where('cart_id', $cart->id)
             ->where('id', $itemId)
             ->firstOrFail();
@@ -123,6 +168,9 @@ class CartController extends Controller
     public function destroy(Request $request, string $itemId): JsonResponse
     {
         $cart = Cart::where('user_id', $request->user()->id)->firstOrFail();
+
+        $this->authorize('update', $cart);
+
         $item = CartItem::where('cart_id', $cart->id)
             ->where('id', $itemId)
             ->firstOrFail();
@@ -141,6 +189,9 @@ class CartController extends Controller
     public function clear(Request $request): JsonResponse
     {
         $cart = Cart::where('user_id', $request->user()->id)->firstOrFail();
+
+        $this->authorize('update', $cart);
+
         $cart->items()->delete();
 
         return response()->json([
