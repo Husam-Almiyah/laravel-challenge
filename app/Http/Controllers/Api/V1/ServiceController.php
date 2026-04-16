@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domains\Catalog\Models\Service;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\ServiceResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,10 +31,9 @@ class ServiceController extends Controller
             $query->where('price', '<=', $request->max_price);
         }
 
-        // Search by name (sanitized)
+        // Search by name
         if ($request->has('search')) {
-            $searchTerm = str_replace(['%', '_'], ['\%', '\_'], $request->search);
-            $query->where('name', 'like', '%'.$searchTerm.'%');
+            $query->where('name', 'like', '%'.$request->search.'%');
         }
 
         $services = $query
@@ -45,7 +43,17 @@ class ServiceController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'services' => ServiceResource::collection($services),
+                'services' => $services->getCollection()->map(fn ($service) => [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'slug' => $service->slug,
+                    'description' => $service->description,
+                    'price' => $service->price,
+                    'category' => $service->category ? [
+                        'id' => $service->category->id,
+                        'name' => $service->category->name,
+                    ] : null,
+                ]),
                 'pagination' => [
                     'current_page' => $services->currentPage(),
                     'per_page' => $services->perPage(),
@@ -76,7 +84,17 @@ class ServiceController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'service' => new ServiceResource($service),
+                'service' => [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'slug' => $service->slug,
+                    'description' => $service->description,
+                    'price' => $service->price,
+                    'category' => $service->category ? [
+                        'id' => $service->category->id,
+                        'name' => $service->category->name,
+                    ] : null,
+                ],
             ],
         ]);
     }

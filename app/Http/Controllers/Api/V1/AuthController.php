@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
-use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +17,6 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -33,7 +30,12 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'User registered successfully',
             'data' => [
-                'user' => new UserResource($user),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ],
                 'token' => $token,
             ],
         ], 201);
@@ -42,8 +44,12 @@ class AuthController extends Controller
     /**
      * Login user and create token.
      */
-    public function login(LoginRequest $request): JsonResponse
+    public function login(Request $request): JsonResponse
     {
+        $request->validate([
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
+        ]);
 
         if (! Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
@@ -59,7 +65,12 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'user' => new UserResource($user),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ],
                 'token' => $token,
             ],
         ]);
@@ -86,7 +97,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => new UserResource($request->user()),
+                'user' => $request->user(),
             ],
         ]);
     }

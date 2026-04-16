@@ -18,7 +18,7 @@ class RegisterRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()->uncompromised()],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'string', 'min:7', 'max:20', 'regex:/^([0-9\s\-\+\(\)]*)$/'],
         ];
     }
 }
