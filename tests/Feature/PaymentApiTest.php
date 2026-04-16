@@ -35,6 +35,7 @@ test('it can initiate a payment successfully', function () {
     $payload = [
         'gateway_id' => PaymentGateway::first()->id,
         'amount' => 100,
+        'city_id' => 1, // Required for gateway availability check
         'payer_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5', // Mock ULID
         'payer_type' => 'App\\Models\\User',
         'payable_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5', // Mock ULID
@@ -53,6 +54,7 @@ test('it handles failed payments', function () {
     $payload = [
         'gateway_id' => PaymentGateway::first()->id,
         'amount' => 404, // Our mock driver fails on 404
+        'city_id' => 1, // Required for gateway availability check
         'payer_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
         'payer_type' => 'App\\Models\\User',
         'payable_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
@@ -90,9 +92,8 @@ test('webhook endpoint rejects unsupported gateways', function () {
 
 test('webhook endpoint rejects gateways without webhook support', function () {
     PaymentGateway::create([
-        'id' => 2,
         'name' => 'apple_pay',
-        'driver' => 'ApplePayDriver',
+        'driver' => 'applePay',
         'is_active' => true,
     ]);
 
@@ -114,6 +115,7 @@ test('payment initiated event is dispatched', function () {
     $payload = [
         'gateway_id' => PaymentGateway::first()->id,
         'amount' => 100,
+        'city_id' => 1, // Required for gateway availability check
         'payer_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
         'payer_type' => 'App\\Models\\User',
         'payable_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
@@ -132,6 +134,7 @@ test('payment succeeded event is dispatched on successful payment', function () 
     $payload = [
         'gateway_id' => PaymentGateway::first()->id,
         'amount' => 100,
+        'city_id' => 1, // Required for gateway availability check
         'payer_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
         'payer_type' => 'App\\Models\\User',
         'payable_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
@@ -151,6 +154,7 @@ test('payment failed event is dispatched on failed payment', function () {
     $payload = [
         'gateway_id' => PaymentGateway::first()->id,
         'amount' => 404,
+        'city_id' => 1, // Required for gateway availability check
         'payer_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',
         'payer_type' => 'App\\Models\\User',
         'payable_id' => '01H7B6K5X5H5X5H5X5H5X5H5X5',

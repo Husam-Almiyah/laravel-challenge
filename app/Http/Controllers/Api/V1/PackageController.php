@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domains\Catalog\Models\Package;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PackageResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,7 +22,20 @@ class PackageController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'packages' => PackageResource::collection($packages),
+                'packages' => $packages->getCollection()->map(fn ($package) => [
+                    'id' => $package->id,
+                    'name' => $package->name,
+                    'slug' => $package->slug,
+                    'description' => $package->description,
+                    'price' => $package->price,
+                    'discount_percentage' => $package->discount_percentage,
+                    'services_count' => $package->services->count(),
+                    'services_preview' => $package->services->take(3)->map(fn ($service) => [
+                        'id' => $service->id,
+                        'name' => $service->name,
+                        'price' => $service->price,
+                    ]),
+                ]),
                 'pagination' => [
                     'current_page' => $packages->currentPage(),
                     'per_page' => $packages->perPage(),
@@ -57,7 +69,27 @@ class PackageController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'package' => new PackageResource($package),
+                'package' => [
+                    'id' => $package->id,
+                    'name' => $package->name,
+                    'slug' => $package->slug,
+                    'description' => $package->description,
+                    'price' => $package->price,
+                    'discount_percentage' => $package->discount_percentage,
+                    'original_price' => $totalServicePrice,
+                    'savings' => $savings,
+                    'services' => $package->services->map(fn ($service) => [
+                        'id' => $service->id,
+                        'name' => $service->name,
+                        'slug' => $service->slug,
+                        'description' => $service->description,
+                        'price' => $service->price,
+                        'category' => $service->category ? [
+                            'id' => $service->category->id,
+                            'name' => $service->category->name,
+                        ] : null,
+                    ]),
+                ],
             ],
         ]);
     }

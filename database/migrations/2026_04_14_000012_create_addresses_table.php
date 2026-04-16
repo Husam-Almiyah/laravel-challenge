@@ -20,6 +20,8 @@ return new class extends Migration
             $table->boolean('is_default')->default(false);
             $table->softDeletes();
             $table->timestamps();
+
+            $table->index('user_id', 'idx_addresses_user_id');
         });
     }
 

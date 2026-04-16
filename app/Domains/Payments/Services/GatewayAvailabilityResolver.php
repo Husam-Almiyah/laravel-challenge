@@ -2,9 +2,11 @@
 
 namespace App\Domains\Payments\Services;
 
+use App\Domains\Account\Enums\UserStatus;
 use App\Domains\Payments\Models\PaymentGateway;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class GatewayAvailabilityResolver
 {
@@ -41,16 +43,19 @@ class GatewayAvailabilityResolver
         }
 
         // 2. Check Module Availability (e.g. only for subscriptions)
-        if (isset($rules['modules']) && ! empty($rules['modules'])) {
-            $module = $context['module'] ?? null;
-            if (! $module || ! in_array($module, $rules['modules'])) {
+        if (! empty($rules['modules'])) {
+            $allowedModules = $rules['modules'];
+            $contextModules = (array) ($context['modules'] ?? []);
+
+            // If any requested modules are not in the gateway's allowed list, deny availability.
+            if (collect($contextModules)->diff($allowedModules)->isNotEmpty()) {
                 return false;
             }
         }
 
         // 3. User Status / Configuration Rule
         if (isset($rules['required_status'])) {
-            $userStatus = $context['user_status'] ?? $context['user']->status ?? 'guest';
+            $userStatus = $context['user_status'] ?? UserStatus::GUEST->value;
             if ($userStatus !== $rules['required_status']) {
                 return false;
             }
@@ -80,9 +85,22 @@ class GatewayAvailabilityResolver
      */
     public function getAvailableGateways(array $context): Collection
     {
-        return PaymentGateway::where('is_active', true)
-            ->orderBy('priority')
-            ->get()
-            ->filter(fn ($gateway) => $this->isAvailable($gateway, $context));
+        // Cache key based on context (excluding large objects like User, use ID instead)
+        $cacheContext = $context;
+        if (isset($cacheContext['user']) && $cacheContext['user'] instanceof User) {
+            $cacheContext['user_id'] = $cacheContext['user']->id;
+            unset($cacheContext['user']);
+        }
+
+        // Use cache version to invalidate all gateway caches when gateways change
+        $cacheVersion = Cache::get('gateways_availability_version', 'v1');
+        $cacheKey = 'gateways_availability_'.$cacheVersion.'_'.md5(json_encode($cacheContext));
+
+        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($context) {
+            return PaymentGateway::where('is_active', true)
+                ->orderBy('priority')
+                ->get()
+                ->filter(fn ($gateway) => $this->isAvailable($gateway, $context));
+        });
     }
 }

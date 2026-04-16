@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domains\Account\Enums\UserStatus;
+use App\Domains\Catalog\Enums\ModuleEnum;
 use App\Domains\Payments\Events\PaymentFailed;
 use App\Domains\Payments\Events\PaymentInitiated;
 use App\Domains\Payments\Events\PaymentSucceeded;
@@ -32,15 +34,18 @@ class PaymentController extends Controller
         $gateways = $this->availabilityResolver->getAvailableGateways([
             'city_id' => $request->city_id,
             'amount' => $request->amount,
-            'module' => $request->module,
+            'modules' => (array) ($request->modules ?? []),
             'user' => $request->user(),
-            'user_status' => $request->user()?->status ?? 'guest',
+            'user_status' => $request->user()?->resolveStatus()->value ?? UserStatus::GUEST->value,
             'day_of_week' => now()->dayOfWeek,
         ]);
 
         return response()->json([
             'success' => true,
             'data' => PaymentGatewayResource::collection($gateways),
+            'meta' => [
+                'count' => $gateways->count(),
+            ],
         ]);
     }
 
@@ -51,6 +56,20 @@ class PaymentController extends Controller
     {
 
         $gateway = PaymentGateway::findOrFail($request->gateway_id);
+
+        $isAvailable = $this->availabilityResolver->isAvailable($gateway, [
+            'user' => $request->user(),
+            'city_id' => $request->city_id,
+            'modules' => [$request->payable_type === 'subscription' ? ModuleEnum::SUBSCRIPTION->value : ModuleEnum::BOOKING->value],
+            'amount' => $request->amount,
+        ]);
+
+        if (! $isAvailable) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gateway not available for this context',
+            ], 400);
+        }
 
         // 1. Create Transaction (State Machine defaults to 'pending')
         $transaction = Transaction::create([

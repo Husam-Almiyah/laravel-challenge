@@ -92,11 +92,53 @@
                     </div>
                 </div>
 
-                <!-- Recent Activity Placeholder -->
+                <!-- Recent Activity -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <h2 class="font-bold text-slate-900 mb-4">Recent Bookings</h2>
                     <div class="space-y-4">
-                        <p class="text-sm text-slate-500 py-4 text-center border border-dashed border-slate-200 rounded-xl italic">No recent bookings found.</p>
+                        @forelse(auth()->user()->bookings()->latest()->take(5)->get() as $booking)
+                            <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition duration-200">
+                                <div class="flex items-center space-x-3">
+                                    <div @class([
+                                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                                        'bg-blue-50 text-blue-600' => $booking->status->value === 'confirmed',
+                                        'bg-amber-50 text-amber-600' => $booking->status->value === 'in_progress',
+                                        'bg-green-50 text-green-600' => $booking->status->value === 'completed',
+                                        'bg-red-50 text-red-600' => in_array($booking->status->value, ['cancelled', 'no_show']),
+                                        'bg-slate-50 text-slate-600' => $booking->status->value === 'pending',
+                                    ])>
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-900">
+                                            @if($booking->items->count() > 1)
+                                                {{ $booking->items->first()->name }} +{{ $booking->items->count() - 1 }} more
+                                            @else
+                                                {{ $booking->items->first()->name ?? 'Maintenance Service' }}
+                                            @endif
+                                        </p>
+                                        <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{{ $booking->scheduled_at->format('M d, Y @ H:i') }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-black text-slate-900">${{ number_format($booking->total_amount, 2) }}</p>
+                                    <p @class([
+                                        'text-[10px] font-bold uppercase tracking-widest',
+                                        'text-blue-600' => $booking->status->value === 'confirmed',
+                                        'text-amber-600' => $booking->status->value === 'in_progress',
+                                        'text-green-600' => $booking->status->value === 'completed',
+                                        'text-red-600' => in_array($booking->status->value, ['cancelled', 'no_show']),
+                                        'text-slate-500' => $booking->status->value === 'pending',
+                                    ])>
+                                        {{ $booking->status->value }}
+                                    </p>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-slate-500 py-4 text-center border border-dashed border-slate-200 rounded-xl italic">No recent bookings found.</p>
+                        @endforelse
                     </div>
                 </div>
             </div>

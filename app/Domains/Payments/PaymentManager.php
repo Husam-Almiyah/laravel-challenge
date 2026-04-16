@@ -24,7 +24,7 @@ class PaymentManager extends Manager
      */
     public function createMadaDriver(): PaymentGatewayInterface
     {
-        return new MadaDriver;
+        return $this->container->make(MadaDriver::class);
     }
 
     /**
@@ -32,7 +32,7 @@ class PaymentManager extends Manager
      */
     public function createStripeDriver(): PaymentGatewayInterface
     {
-        return new StripeDriver;
+        return $this->container->make(StripeDriver::class);
     }
 
     /**
@@ -40,7 +40,7 @@ class PaymentManager extends Manager
      */
     public function createApplePayDriver(): PaymentGatewayInterface
     {
-        return new ApplePayDriver;
+        return $this->container->make(ApplePayDriver::class);
     }
 
     /**

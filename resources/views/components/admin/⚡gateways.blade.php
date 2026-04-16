@@ -3,6 +3,9 @@
 use Livewire\Component;
 use App\Domains\Payments\Models\PaymentGateway;
 use App\Models\City;
+use App\Domains\Catalog\Enums\ModuleEnum;
+use App\Domains\Account\Enums\UserStatus;
+use Illuminate\Support\Str;
 
 new class extends Component
 {
@@ -10,6 +13,10 @@ new class extends Component
     public $cities;
     public $editingGatewayId = null;
     public $selectedCities = [];
+    public $selectedModules = [];
+    public $minAmount = 0;
+    public $requiredStatus = '';
+    public $selectedDays = [];
 
     public function mount()
     {
@@ -35,13 +42,42 @@ new class extends Component
         $this->editingGatewayId = $id;
         $gateway = PaymentGateway::find($id);
         $this->selectedCities = $gateway->rules['cities'] ?? [];
+        $this->selectedModules = $gateway->rules['modules'] ?? [];
+        $this->minAmount = $gateway->rules['min_amount'] ?? 0;
+        $this->requiredStatus = $gateway->rules['required_status'] ?? '';
+        $this->selectedDays = $gateway->rules['allowed_days'] ?? [];
     }
 
     public function saveRules()
     {
         $gateway = PaymentGateway::find($this->editingGatewayId);
-        $rules = $gateway->rules ?? [];
-        $rules['cities'] = array_map('strval', $this->selectedCities);
+        
+        $rules = [];
+        
+        // Cities (strictly as integers)
+        if (!empty($this->selectedCities)) {
+            $rules['cities'] = array_map('intval', $this->selectedCities);
+        }
+        
+        // Modules
+        if (!empty($this->selectedModules)) {
+            $rules['modules'] = $this->selectedModules;
+        }
+        
+        // Min Amount
+        if ($this->minAmount > 0) {
+            $rules['min_amount'] = (float) $this->minAmount;
+        }
+        
+        // Required Status
+        if (!empty($this->requiredStatus)) {
+            $rules['required_status'] = $this->requiredStatus;
+        }
+
+        // Allowed Days (integers 0-6)
+        if (!empty($this->selectedDays)) {
+            $rules['allowed_days'] = array_map('intval', $this->selectedDays);
+        }
         
         $gateway->rules = $rules;
         $gateway->save();
@@ -92,13 +128,47 @@ new class extends Component
                         </td>
                         <td class="px-8 py-6">
                             <div class="flex flex-wrap gap-2">
-                                @php $cityCount = count($gateway->rules['cities'] ?? []) @endphp
+                                @php 
+                                    $rules = $gateway->rules ?? [];
+                                    $cityCount = count($rules['cities'] ?? []);
+                                    $modules = $rules['modules'] ?? [];
+                                    $minAmount = $rules['min_amount'] ?? 0;
+                                    $status = $rules['required_status'] ?? null;
+                                    $daysCount = count($rules['allowed_days'] ?? []);
+                                @endphp
+
                                 @if($cityCount > 0)
-                                    <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-                                        {{ $cityCount }} Cities Restricted
+                                    <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                                        {{ $cityCount }} Cities
                                     </span>
-                                @else
-                                    <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Available Everywhere</span>
+                                @endif
+
+                                @if($daysCount > 0)
+                                    <span class="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                                        {{ $daysCount }} Days
+                                    </span>
+                                @endif
+
+                                @foreach($modules as $module)
+                                    <span class="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                                        {{ $module }}
+                                    </span>
+                                @endforeach
+
+                                @if($status)
+                                    <span class="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                                        {{ $status }} Only
+                                    </span>
+                                @endif
+
+                                @if($minAmount > 0)
+                                    <span class="text-[10px] font-black text-slate-600 bg-slate-100 px-2 py-1 rounded-lg uppercase tracking-wider">
+                                        Min: ${{ number_format($minAmount, 2) }}
+                                    </span>
+                                @endif
+
+                                @if(empty($rules))
+                                    <span class="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-lg uppercase tracking-wider">No Restrictions</span>
                                 @endif
                             </div>
                         </td>
@@ -133,21 +203,86 @@ new class extends Component
             <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                 <div class="p-8 border-b border-slate-100">
                     <h3 class="text-xl font-black text-slate-900 tracking-tight">Manage Gateway Rules</h3>
-                    <p class="text-sm text-slate-500 mt-1">Configure which cities can use this payment method.</p>
+                    <p class="text-sm text-slate-500 mt-1">Configure availability rules for this payment method.</p>
                 </div>
                 
-                <div class="p-8 space-y-6">
+                <div class="p-8 space-y-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                    <!-- City Restrictions -->
                     <div>
-                        <label class="block text-sm font-black text-slate-400 uppercase tracking-widest mb-4">City Restrictions</label>
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">City Restrictions</label>
                         <div class="grid grid-cols-2 gap-3">
                             @foreach($cities as $city)
-                                <label class="flex items-center p-4 rounded-2xl border-2 transition-all cursor-pointer @if(in_array($city->id, $selectedCities)) border-indigo-600 bg-indigo-50 @else border-slate-100 hover:border-indigo-200 @endif">
-                                    <input type="checkbox" value="{{ $city->id }}" wire:model="selectedCities" class="hidden">
+                                @php $isSelected = in_array((int)$city->id, array_map('intval', $this->selectedCities)) @endphp
+                                <label class="group flex items-center p-3 rounded-2xl border-2 transition-all cursor-pointer @if($isSelected) border-indigo-600 bg-indigo-50 @else border-slate-100 hover:border-slate-200 @endif">
+                                    <input type="checkbox" value="{{ $city->id }}" wire:model.live="selectedCities" class="hidden">
+                                    <div @class([
+                                        'w-4 h-4 rounded-full border-2 mr-3 transition-all',
+                                        'border-indigo-600 bg-indigo-600' => $isSelected,
+                                        'border-slate-200 bg-white' => !$isSelected,
+                                    ])></div>
                                     <span @class([
                                         'text-sm font-bold',
-                                        'text-indigo-700' => in_array($city->id, $selectedCities),
-                                        'text-slate-600' => !in_array($city->id, $selectedCities),
+                                        'text-indigo-700' => $isSelected,
+                                        'text-slate-600' => !$isSelected,
                                     ])>{{ $city->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Module Availability -->
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Module Availability</label>
+                        <div class="flex flex-wrap gap-3">
+                            @foreach(ModuleEnum::cases() as $module)
+                                @php $isModSelected = in_array($module->value, $this->selectedModules) @endphp
+                                <label class="flex items-center p-3 px-5 rounded-2xl border-2 transition-all cursor-pointer @if($isModSelected) border-emerald-600 bg-emerald-50 @else border-slate-100 hover:border-slate-200 @endif">
+                                    <input type="checkbox" value="{{ $module->value }}" wire:model.live="selectedModules" class="hidden">
+                                    <span @class([
+                                        'text-sm font-bold uppercase tracking-wide',
+                                        'text-emerald-700' => $isModSelected,
+                                        'text-slate-600' => !$isModSelected,
+                                    ])>{{ $module->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8">
+                        <!-- User Status -->
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Required User Status</label>
+                            <select wire:model.live="requiredStatus" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 transition">
+                                <option value="">Any Status</option>
+                                @foreach([UserStatus::GUEST, UserStatus::VERIFIED] as $status)
+                                    <option value="{{ $status->value }}">{{ Str::title($status->value) }} Only</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Minimum Amount -->
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Minimum Amount (SAR)</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <input type="number" step="0.01" wire:model.live="minAmount" class="w-full bg-slate-50 border-none rounded-2xl p-4 pl-8 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 transition" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Allowed Days -->
+                    <div class="pt-6 border-t border-slate-100">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Allowed Days (Week Availability)</label>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $index => $day)
+                                @php $isDaySelected = in_array($index, array_map('intval', $this->selectedDays)) @endphp
+                                <label class="flex-1 min-w-[80px] flex items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer @if($isDaySelected) border-rose-600 bg-rose-50 @else border-slate-100 hover:border-slate-200 @endif">
+                                    <input type="checkbox" value="{{ $index }}" wire:model.live="selectedDays" class="hidden">
+                                    <span @class([
+                                        'text-xs font-black uppercase tracking-widest',
+                                        'text-rose-700' => $isDaySelected,
+                                        'text-slate-400' => !$isDaySelected,
+                                    ])>{{ $day }}</span>
                                 </label>
                             @endforeach
                         </div>

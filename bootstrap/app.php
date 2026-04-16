@@ -18,6 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withEvents(discover: [
-        __DIR__.'/../app/Domains/Payments/Listeners',
+        __DIR__.'/../app/Domains/Payments',
     ])
     ->create();

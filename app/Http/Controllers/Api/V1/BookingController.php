@@ -2,31 +2,35 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domains\Booking\Enums\BookingStatus;
 use App\Domains\Booking\Models\Booking;
-use App\Domains\Booking\Models\Cart;
 use App\Domains\Booking\Services\BookingService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
 {
+    public function __construct(
+        protected BookingService $bookingService
+    ) {}
+
     /**
      * List user's bookings.
      */
     public function index(Request $request): JsonResponse
     {
-        $bookings = Booking::with(['items.itemable'])
+        $bookings = Booking::with(['items.itemable', 'address'])
             ->where('user_id', $request->user()->id)
             ->orderBy('scheduled_at', 'desc')
-            ->paginate($request->get('per_page', 15));
+            ->paginate(min($request->get('per_page', 15), 50));
 
         return response()->json([
             'success' => true,
             'data' => [
-                'bookings' => BookingResource::collection($bookings),
+                'bookings' => BookingResource::collection($bookings->getCollection()),
                 'pagination' => [
                     'current_page' => $bookings->currentPage(),
                     'per_page' => $bookings->perPage(),
@@ -46,6 +50,8 @@ class BookingController extends Controller
             ->where('user_id', $request->user()->id)
             ->findOrFail($id);
 
+        $this->authorize('view', $booking);
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -57,19 +63,27 @@ class BookingController extends Controller
     /**
      * Create a booking from cart.
      */
-    public function store(StoreBookingRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $user = $request->user();
 
+        $validated = $request->validate([
+            'scheduled_at' => 'required|date|after:now',
+            'address_id' => [
+                'required',
+                Rule::exists('addresses', 'id')->where('user_id', $user->id),
+            ],
+            'notes' => 'nullable|string|max:500',
+        ]);
+
         try {
-            $bookingService = new BookingService;
-            $booking = $bookingService->createFromCart($user, $request->validated());
+            $booking = $this->bookingService->createFromCart($user, $validated);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Booking created successfully',
                 'data' => [
-                    'booking' => new BookingResource($booking),
+                    'booking' => new BookingResource($booking->load(['items', 'address'])),
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -88,15 +102,9 @@ class BookingController extends Controller
         $booking = Booking::where('user_id', $request->user()->id)
             ->findOrFail($id);
 
-        // Only allow cancellation of pending or confirmed bookings
-        if (! in_array($booking->status, ['pending', 'confirmed'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Booking cannot be cancelled',
-            ], 422);
-        }
+        $this->authorize('cancel', $booking);
 
-        $booking->update(['status' => 'cancelled']);
+        $booking->update(['status' => BookingStatus::CANCELLED]);
 
         return response()->json([
             'success' => true,

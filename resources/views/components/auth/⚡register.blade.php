@@ -6,6 +6,9 @@ use Livewire\Attributes\Title;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use App\Domains\Subscriptions\Models\SubscriptionPlan;
+use App\Domains\Subscriptions\Services\SubscriptionService;
+use Illuminate\Validation\Rules\Password;
 
 new #[Layout('layouts.app'), Title('Register - Ajeer Boost')] class extends Component
 {
@@ -20,8 +23,8 @@ new #[Layout('layouts.app'), Title('Register - Ajeer Boost')] class extends Comp
         $this->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'phone' => 'required|string|max:20',
-            'password' => 'required|string|min:8|confirmed',
+            'phone' => ['nullable', 'string', 'min:7', 'max:20', 'regex:/^([0-9\s\-\+\(\)]*)$/'],
+            'password' => ['required', 'string', Password::min(8)->uncompromised(), 'confirmed'],
         ]);
 
         $user = User::create([
@@ -33,6 +36,17 @@ new #[Layout('layouts.app'), Title('Register - Ajeer Boost')] class extends Comp
         ]);
 
         Auth::login($user);
+
+        // Activate Trial Subscription
+        try {
+            $plan = SubscriptionPlan::where('slug', 'basic')->first();
+            if ($plan) {
+                (new SubscriptionService())->activateTrial($user, $plan->id);
+            }
+        } catch (\Exception $e) {
+            // Log error or handle gracefully - for now we just continue to dashboard
+            report($e);
+        }
 
         return $this->redirect('/dashboard');
     }
@@ -63,8 +77,8 @@ new #[Layout('layouts.app'), Title('Register - Ajeer Boost')] class extends Comp
                         </div>
 
                         <div>
-                            <label for="phone" class="block text-sm font-medium text-slate-700">Phone Number</label>
-                            <input wire:model="phone" type="text" id="phone" required
+                            <label for="phone" class="block text-sm font-medium text-slate-700">Phone Number (Optional)</label>
+                            <input wire:model="phone" type="text" id="phone"
                                 class="mt-1 block w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200">
                             @error('phone') <span class="mt-1 text-xs text-red-500">{{ $message }}</span> @enderror
                         </div>
