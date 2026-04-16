@@ -6,7 +6,6 @@ use App\Domains\Subscriptions\Models\Subscription;
 use App\Domains\Subscriptions\Models\SubscriptionPlan;
 use App\Domains\Subscriptions\Services\SubscriptionService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Subscription\ActivateTrialRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +13,10 @@ use Illuminate\Http\Request;
 
 class SubscriptionController extends Controller
 {
+    public function __construct(
+        protected SubscriptionService $subscriptionService
+    ) {}
+
     /**
      * List available subscription plans.
      */
@@ -21,12 +24,16 @@ class SubscriptionController extends Controller
     {
         $plans = SubscriptionPlan::where('is_active', true)
             ->orderBy('price')
-            ->get();
+            ->paginate(20);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'plans' => SubscriptionPlanResource::collection($plans),
+            'data' => SubscriptionPlanResource::collection($plans),
+            'meta' => [
+                'current_page' => $plans->currentPage(),
+                'last_page' => $plans->lastPage(),
+                'per_page' => $plans->perPage(),
+                'total' => $plans->total(),
             ],
         ]);
     }
@@ -51,8 +58,6 @@ class SubscriptionController extends Controller
             ]);
         }
 
-        $daysRemaining = now()->diffInDays($subscription->ends_at, false);
-
         return response()->json([
             'success' => true,
             'data' => [
@@ -64,19 +69,23 @@ class SubscriptionController extends Controller
     /**
      * Activate trial subscription.
      */
-    public function activateTrial(ActivateTrialRequest $request): JsonResponse
+    public function activateTrial(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $request->validate([
+            'plan_id' => 'required|exists:subscription_plans,id',
+        ]);
 
         try {
-            $subscriptionService = new SubscriptionService;
-            $subscription = $subscriptionService->activateTrial($user, $request->plan_id);
+            $subscription = $this->subscriptionService->activateTrial(
+                $request->user(),
+                $request->plan_id
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Trial subscription activated',
                 'data' => [
-                    'subscription' => new SubscriptionResource($subscription),
+                    'subscription' => new SubscriptionResource($subscription->load('plan')),
                 ],
             ], 201);
         } catch (\Exception $e) {

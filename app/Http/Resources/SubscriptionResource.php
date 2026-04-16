@@ -18,14 +18,19 @@ class SubscriptionResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'plan' => new SubscriptionPlanResource($this->whenLoaded('plan')),
+            'plan' => $this->whenLoaded('plan', function () {
+                return [
+                    'id' => $this->plan->id,
+                    'name' => $this->plan->name,
+                    'description' => $this->plan->description,
+                ];
+            }),
             'starts_at' => $this->starts_at,
             'ends_at' => $this->ends_at,
             'status' => $this->status,
             'days_remaining' => max(0, $daysRemaining),
             'is_trial' => $this->is_trial,
             'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
         ];
     }
 }

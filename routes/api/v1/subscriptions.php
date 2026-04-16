@@ -14,7 +14,8 @@ Route::prefix('subscriptions')->group(function () {
 
     // Protected subscription actions
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('trial', [SubscriptionController::class, 'activateTrial']);
+        Route::post('trial', [SubscriptionController::class, 'activateTrial'])
+            ->middleware('throttle:3,1');
         Route::get('my', [SubscriptionController::class, 'mySubscription']);
     });
 });

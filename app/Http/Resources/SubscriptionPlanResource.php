@@ -21,11 +21,10 @@ class SubscriptionPlanResource extends JsonResource
             'description' => $this->description,
             'price' => $this->price,
             'duration_days' => $this->duration_days,
-            'features' => $this->features,
             'trial_days' => $this->trial_days,
+            'features' => $this->features,
+            'is_active' => $this->is_active,
             'is_trial_available' => $this->trial_days > 0,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
         ];
     }
 }
