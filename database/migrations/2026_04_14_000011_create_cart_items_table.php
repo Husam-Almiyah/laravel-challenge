@@ -20,6 +20,8 @@ return new class extends Migration
             // Indexes
             $table->index(['cart_id'], 'idx_cart');
             $table->index(['itemable_type', 'itemable_id'], 'idx_itemable');
+            $table->index('cart_id', 'idx_cart_items_cart_id');
+            $table->unique(['cart_id', 'itemable_id', 'itemable_type'], 'uk_cart_itemable');
         });
     }
 

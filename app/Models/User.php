@@ -3,8 +3,11 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Domains\Account\Enums\UserStatus;
 use App\Domains\Account\Models\Address;
+use App\Domains\Booking\Models\Booking;
 use App\Domains\Booking\Models\Cart;
+use App\Domains\Subscriptions\Enums\SubscriptionStatus;
 use App\Domains\Subscriptions\Models\Subscription;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,7 +20,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'phone', 'role', 'trial_used_at'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'trial_used_at', 'role'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -25,27 +28,19 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, HasUlids, Notifiable;
 
     /**
-     * Check if the user has the admin role.
-     */
-    public function isAdmin(): bool
-    {
-        return $this->role === 'admin';
-    }
-
-    /**
-     * Check if the user has the client role.
-     */
-    public function isClient(): bool
-    {
-        return $this->role === 'client';
-    }
-
-    /**
      * Get the addresses for the user.
      */
     public function addresses(): HasMany
     {
         return $this->hasMany(Address::class);
+    }
+
+    /**
+     * Get the subscriptions for the user.
+     */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
     }
 
     /**
@@ -57,11 +52,38 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the subscriptions for the user.
+     * Get the bookings for the user.
      */
-    public function subscriptions(): HasMany
+    public function bookings(): HasMany
     {
-        return $this->hasMany(Subscription::class);
+        return $this->hasMany(Booking::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Resolve the current user status based on verification.
+     */
+    public function resolveStatus(): UserStatus
+    {
+        return $this->email_verified_at !== null
+            ? UserStatus::VERIFIED
+            : UserStatus::GUEST;
+    }
+
+    /**
+     * Check if the user has an active, non-expired subscription.
+     */
+    public function hasActiveSubscription(): bool
+    {
+        return $this->subscriptions()
+            ->where('status', SubscriptionStatus::ACTIVE)
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->exists();
     }
 
     /**
@@ -74,6 +96,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'status' => UserStatus::class,
             'trial_used_at' => 'datetime',
         ];
     }

@@ -21,6 +21,18 @@ return new class extends Migration
 
             // Indexes
             $table->index(['user_id', 'status'], 'idx_user_status');
+            $table->index('ends_at', 'idx_subscriptions_ends_at');
+            $table->index(['user_id', 'status', 'is_trial'], 'idx_user_status_trial');
+        });
+
+        // Add generated column and unique index in separate block to satisfy MySQL/MariaDB requirements
+        // We use VIRTUAL instead of STORED because STORED columns cannot reference columns involved in cascading foreign keys.
+        Schema::table('subscriptions', function (Blueprint $table) {
+            $table->char('active_user_id', 26)
+                ->nullable()
+                ->virtualAs("CASE WHEN status = 'active' THEN user_id ELSE NULL END")
+                ->unique('uk_subscriptions_active_user')
+                ->after('is_trial');
         });
     }
 
